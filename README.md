@@ -2,6 +2,12 @@
 
 A small Spark 4.2.0 standalone cluster for learning Spark locally with Docker. It includes 1 Spark master, 4 workers, JupyterLab, Spark UI access, AQE experiments, and Delta Lake support.
 
+# Supports
+### JupyterLab - Notebooks
+### AQE - Adaptive Query Execution
+### DeltaLake - Delta format tables
+### ClusterPartitions - Partition by cluster
+
 ## Quick Start
 
 ### 1. Install
