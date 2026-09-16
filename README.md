@@ -1,30 +1,33 @@
 # Tiny Spark Docker Cluster
 
-A small Spark 4.2.0 standalone cluster for learning Spark locally with Docker. It includes 1 Spark master, 4 workers, JupyterLab, Spark UI access, AQE experiments, and Delta Lake support.
+A lightweight local **Apache Spark 4.2.0** standalone cluster built with Docker for hands-on learning and experimentation.
 
-# Supports
-#### JupyterLab - Notebooks
-#### AQE - Adaptive Query Execution
-#### DeltaLake - Delta format tables
-#### ClusterPartitions - Partition by cluster
+It provides a complete mini Spark environment with:
 
-## Quick Start
+- **1 Spark Master**
+- **4 Spark Workers**
+- **JupyterLab** for interactive PySpark development
+- **Delta Lake** support
+- **Adaptive Query Execution (AQE)** experiments
+- **Live Spark UI** for jobs, stages, tasks, and executors
+- **Spark History Server** with persisted event logs
+- Local `jobs/` and `data/` folders mounted directly into the cluster
 
-### 1. Install
+## What You Need
 
-You need:
+Install:
 
 - Docker Desktop
 - Git
 
-### 2. Clone the repo
+Clone the repo:
 
 ```bash
 git clone git@github.com:GurmanGill/spark_cluster.git
 cd spark_cluster
 ```
 
-### 3. Build and start the cluster
+Build and start everything:
 
 ```bash
 docker compose up -d --build
@@ -36,7 +39,7 @@ Check the containers:
 docker compose ps
 ```
 
-You should see:
+Expected containers:
 
 ```text
 spark-master
@@ -46,108 +49,65 @@ spark-worker-3
 spark-worker-4
 ```
 
-Stop the cluster with:
+Stop the cluster:
 
 ```bash
 docker compose down
 ```
 
----
+## Open the UIs
 
-## Open the Interfaces
+| UI                   | URL                    | Purpose                                           |
+| -------------------- | ---------------------- | ------------------------------------------------- |
+| JupyterLab           | http://localhost:8888  | Run the notebooks                                 |
+| Spark Master UI      | http://localhost:9000  | Workers, cores, memory, applications              |
+| Spark Driver UI      | http://localhost:4040  | Live jobs, stages, tasks, executors and SQL plans |
+| Spark History Server | http://localhost:18080 | View persisted Spark application history          |
 
-### Spark Cluster UI
+Port `4040` becomes available after the notebook creates a `SparkSession`.
 
-```text
-http://localhost:9000
-```
-
-This is the Spark Standalone Master UI. Use it to see:
-
-- registered workers
-- available cores and memory
-- running applications
-- completed applications
-
-### Spark Jobs / Stages / Tasks UI
+## Repo Layout
 
 ```text
-http://localhost:4040
+spark_cluster/
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── start-master.sh
+├── jobs/
+│   ├── test.ipynb
+│   └── spark_utils.py
+├── data/
+└── spark-events/
 ```
 
-This is the Spark Driver UI for the active notebook Spark application. Use it to inspect:
+The local folders are mounted directly into the containers:
 
-- Jobs
-- Stages
-- Tasks
-- Executors
-- SQL plans
-- Shuffle read/write
+```text
+Local repo                 Docker
 
-Port `4040` is available after a notebook creates a `SparkSession`.
+./jobs         <------->   /workspace/jobs
+./data         <------->   /workspace/data
+./spark-events <------->   /workspace/spark-events
+```
 
-### JupyterLab
+This means notebook, Python, data, Delta-table, and Spark event-log changes are immediately visible on your local machine and survive container recreation.
+
+## Sample Notebook
+
+Open:
 
 ```text
 http://localhost:8888
 ```
 
-The repo starts JupyterLab automatically inside the `spark-master` container.
-
-Open `test.ipynb` from the `jobs/` folder to run the sample Spark code.
-
----
-
-## Local Files and Docker Volumes
-
-Docker Compose maps these local folders directly into every Spark container:
-
-```yaml
-volumes:
-  - ./jobs:/jobs
-  - ./data:/data
-```
-
-That means:
-
-```text
-Local repo                 Docker containers
-
-./jobs        <--------->  /jobs
-./data        <--------->  /data
-```
-
-You can edit notebooks, Python jobs, or data directly from your local repo and the changes are immediately visible inside the containers.
-
-For example:
+Then open:
 
 ```text
 jobs/test.ipynb
 ```
 
-is available inside Docker as:
-
-```text
-/jobs/test.ipynb
-```
-
-Delta files written to:
-
-```text
-/data/delta/category_summary
-```
-
-are stored locally under:
-
-```text
-data/delta/category_summary
-```
-
----
-
-## How the Spark Test Notebook Works
-
-The notebook creates a Spark Driver and connects it to the standalone Spark Master:
+The notebook creates a Spark Driver and connects it to the standalone master:
 
 ```python
 from delta import configure_spark_with_delta_pip
@@ -157,8 +117,10 @@ builder = (
     SparkSession.builder
     .appName("DeltaLab")
     .master("spark://spark-master:7077")
-    .config("spark.executor.memory", "512m")
+    .config("spark.executor.memory", "1g")
     .config("spark.executor.cores", "1")
+    .config("spark.eventLog.enabled", "true")
+    .config("spark.eventLog.dir", "file:/workspace/spark-events")
     .config(
         "spark.sql.extensions",
         "io.delta.sql.DeltaSparkSessionExtension"
@@ -172,7 +134,7 @@ builder = (
 spark = configure_spark_with_delta_pip(builder).getOrCreate()
 ```
 
-The flow is:
+The execution flow is:
 
 ```text
 Jupyter notebook
@@ -183,92 +145,133 @@ Spark Driver JVM
       ↓
 Spark Master
       ↓
-Spark Workers
+Workers
       ↓
 Executor JVMs
       ↓
-Tasks process partitions
+Stages → Tasks → Partitions
 ```
 
-### Adaptive Query Execution
+When finished with the notebook Spark application:
 
-AQE can be enabled in the notebook with:
+```python
+spark.stop()
+```
+
+The master and workers continue running; only the current Spark application stops.
+
+## AQE
+
+Adaptive Query Execution can be enabled from the notebook:
 
 ```python
 spark.conf.set("spark.sql.adaptive.enabled", "true")
 ```
 
-Use the Spark Driver UI on port `4040` to compare jobs, stages, and query plans with AQE enabled or disabled.
+Use `localhost:4040` to compare stages, shuffle behavior, and physical plans with AQE enabled or disabled.
 
----
+## Delta Lake
 
-## Delta Lake Support
+Python dependencies are defined in `requirements.txt`:
 
-Delta Lake is installed through `.env`:
-
-```env
-PYTHON_PACKAGES=jupyterlab ipykernel pandas pyarrow requests delta-spark==4.4.0
+```text
+jupyterlab==4.6.3
+ipykernel
+pandas
+pyarrow
+requests
+delta-spark==4.4.0
 ```
 
-The notebook configures the Delta Spark extensions and catalog, so DataFrames can be written using:
+The Docker image also downloads and caches the matching Delta JVM dependencies during image build, so the notebook does not need to download the Delta JARs every time a SparkSession starts.
+
+Write a Delta table:
 
 ```python
 result.write \
     .format("delta") \
     .mode("overwrite") \
-    .save("/data/delta/category_summary")
+    .save("/workspace/data/delta/category_summary")
 ```
 
-A Delta table contains Parquet data files plus a transaction log:
+A Delta table contains Parquet files plus its transaction log:
 
 ```text
-category_summary/
+data/delta/category_summary/
 ├── _delta_log/
-├── part-....parquet
 └── part-....parquet
 ```
 
----
+## Job Tracking
+
+`jobs/spark_utils.py` provides a small helper that assigns a short UUID-based job group and readable description:
+
+```python
+from spark_utils import set_job_context
+
+job_id = set_job_context(
+    spark,
+    "Read Delta table"
+)
+```
+
+The Spark UI then groups the internal Spark jobs under IDs such as:
+
+```text
+JOB-6f44d309 - Read Delta table
+```
+
+One notebook action can create multiple Spark jobs. Each Spark job can contain multiple stages, and each stage contains tasks.
+
+```text
+Notebook action
+      ↓
+Job Group
+      ↓
+Spark Job(s)
+      ↓
+Stage(s)
+      ↓
+Task(s)
+```
 
 ## Architecture
 
 ```text
-Mac / Host
+Host / Mac
 │
-├── localhost:8888  → JupyterLab
-├── localhost:9000  → Spark Master UI
-├── localhost:4040  → Spark Driver UI
+├── :8888   JupyterLab
+├── :9000   Spark Master UI
+├── :4040   Live Spark Driver UI
+├── :18080  Spark History Server
 │
 └── Docker network: spark-net
     │
     ├── spark-master
-    │   ├── 2 CPUs
-    │   ├── 1 GB RAM
+    │   ├── 4 CPU limit
+    │   ├── 1 GB RAM limit
     │   ├── Spark Master JVM
+    │   ├── Spark History Server
     │   ├── JupyterLab
-    │   └── Spark Driver JVM when a notebook creates SparkSession
+    │   └── Spark Driver JVM when a notebook starts Spark
     │
     ├── spark-worker-1
     ├── spark-worker-2
     ├── spark-worker-3
     └── spark-worker-4
-        ├── 0.5 CPU each
+        ├── 1 CPU each
         ├── 1 GB RAM each
         ├── 1 Spark core each
         └── Executor JVMs run application tasks
 ```
 
----
+## How Startup Works
 
-## How Docker Compose Starts Everything
-
-`docker-compose.yml` creates the custom `spark-net` network and starts all five containers from the same image:
+`docker-compose.yml` creates the `spark-net` Docker network and starts all five containers from the same image:
 
 ```text
 spark_lab:4.2.0-python3
 ```
-
-### Master
 
 The master runs:
 
@@ -276,26 +279,15 @@ The master runs:
 /opt/spark/start-master.sh
 ```
 
-`start-master.sh` starts the Spark Master in the background:
+That script starts three services inside the master container:
 
-```bash
-spark-class org.apache.spark.deploy.master.Master
+```text
+Spark Master
+Spark History Server
+JupyterLab
 ```
 
-and keeps JupyterLab running in the foreground:
-
-```bash
-jupyter lab \
-  --ip=0.0.0.0 \
-  --port=8888 \
-  --no-browser \
-  --IdentityProvider.token= \
-  --ServerApp.root_dir=/jobs
-```
-
-### Workers
-
-Each worker starts with:
+Workers start with:
 
 ```bash
 spark-class \
@@ -303,65 +295,38 @@ spark-class \
   spark://spark-master:7077
 ```
 
-Docker DNS resolves the hostname `spark-master`, allowing every worker to register with the master.
+Docker DNS resolves `spark-master`, allowing every worker to register with the master.
 
-Each worker is configured with:
+The worker configuration is:
 
 ```yaml
 SPARK_WORKER_CORES: 1
 SPARK_WORKER_MEMORY: 1g
 ```
 
----
+## Spark History
 
-## Environment and Image Setup
+The notebook writes Spark event logs to:
 
-`.env` defines the Python packages installed during the Docker image build:
-
-```env
-PYTHON_PACKAGES=jupyterlab ipykernel pandas pyarrow requests delta-spark==4.4.0
+```text
+/workspace/spark-events
 ```
 
-Docker Compose passes this value into the Dockerfile:
+which is mapped to:
 
-```yaml
-build:
-  context: .
-  args:
-    PYTHON_PACKAGES: ${PYTHON_PACKAGES}
+```text
+./spark-events
 ```
 
-The Dockerfile starts from:
-
-```dockerfile
-FROM spark:4.2.0-python3
-```
-
-so Java, Spark, Python, and PySpark already come from the same Spark 4.2.0 image. The Dockerfile then adds Jupyter and the additional Python libraries used by this lab.
-
----
-
-## Useful Commands
+The History Server reads the same directory. Because the directory lives on the host, application history remains available after:
 
 ```bash
-# Build and start
-docker compose up -d --build
-
-# Start without rebuilding
-docker compose up -d
-
-# Check containers
-docker compose ps
-
-# Watch CPU and RAM
-docker stats
-
-# Enter the master container
-docker exec -it spark-master bash
-
-# View worker logs
-docker logs spark-worker-1
-
-# Stop the cluster
 docker compose down
+docker compose up -d
+```
+
+Open persisted history at:
+
+```text
+http://localhost:18080
 ```
