@@ -106,6 +106,30 @@ docker compose down
 
 Port `4040` becomes available after the notebook creates a `SparkSession`.
 
+### Jupyter Notebook
+
+<p align="center">
+  <img src="img/notebook.png" alt="Jupyter Notebook" width="750">
+</p>
+
+### Spark Cluster UI
+
+<p align="center">
+  <img src="img/spark_cluster.png" alt="Spark Cluster UI" width="750">
+</p>
+
+### Spark Jobs and Stages
+
+<p align="center">
+  <img src="img/spark_jobs.png" alt="Spark Jobs UI" width="750">
+</p>
+
+### Spark History Server
+
+<p align="center">
+  <img src="img/history_server.png" alt="Spark History Server" width="750">
+</p>
+
 ## Repo Layout
 
 ```text
