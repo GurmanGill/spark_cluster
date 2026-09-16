@@ -19,7 +19,7 @@ The cluster includes:
 
 It is designed to help you understand how Spark actually executes workloads:
 
-````text
+```text
 DataFrame operations
         ↓
 Spark Jobs
@@ -31,6 +31,7 @@ Tasks
 Executors
         ↓
 Worker CPU / Memory
+```
 
 ## Ideal for experimenting:
 
@@ -65,7 +66,7 @@ Clone the repo:
 ```bash
 git clone git@github.com:GurmanGill/spark_cluster.git
 cd spark_cluster
-````
+```
 
 Build and start everything:
 
