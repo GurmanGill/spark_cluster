@@ -4,8 +4,6 @@ services:
   spark-master:
     build:
       context: .
-      args:
-        PYTHON_PACKAGES: ${PYTHON_PACKAGES}
 
     image: spark_lab:4.2.0-python3
 
@@ -26,10 +24,12 @@ services:
       - "9000:8080"
       - "4040:4040"   # Spark Driver / Application UI
       - "8888:8888"
+      - "18080:18080"
 
     volumes:
       - ./jobs:/workspace/jobs
       - ./data:/workspace/data
+      - ./spark-events:/workspace/spark-events
 
     networks:
       - spark-net

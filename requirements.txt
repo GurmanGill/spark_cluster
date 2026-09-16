@@ -1,0 +1,6 @@
+jupyterlab==4.6.3
+ipykernel
+pandas
+pyarrow
+requests
+delta-spark==4.4.0
