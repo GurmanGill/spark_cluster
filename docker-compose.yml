@@ -25,6 +25,8 @@ services:
     ports:
       - "7077:7077"
       - "9000:8080"
+      - "4040:4040"   # Spark Driver / Application UI
+      - "8888:8888"
 
     volumes:
       - ./jobs:/jobs
