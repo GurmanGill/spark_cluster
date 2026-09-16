@@ -16,5 +16,6 @@ exec jupyter lab \
   --ip=0.0.0.0 \
   --port=8888 \
   --no-browser \
-  --IdentityProvider.token=spark-lab \
+  --IdentityProvider.token= \
+   --ServerApp.disable_check_xsrf=True \
   --ServerApp.root_dir=/workspace
