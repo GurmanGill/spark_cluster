@@ -13,7 +13,7 @@ services:
     hostname: spark-master
 
     # Resource limits
-    cpus: 2.0
+    cpus: 4.0
     mem_limit: 1g
 
     # Start Spark Master
@@ -43,7 +43,7 @@ services:
     hostname: spark-worker-1
 
     # Resource limits
-    cpus: 0.5
+    cpus: 1
     mem_limit: 1g
 
     # Start worker and register with master
@@ -74,7 +74,7 @@ services:
     container_name: spark-worker-2
     hostname: spark-worker-2
 
-    cpus: 0.5
+    cpus: 1
     mem_limit: 1g
 
     command:
@@ -104,7 +104,7 @@ services:
     container_name: spark-worker-3
     hostname: spark-worker-3
 
-    cpus: 0.5
+    cpus: 1
     mem_limit: 1g
 
     command:
@@ -134,7 +134,7 @@ services:
     container_name: spark-worker-4
     hostname: spark-worker-4
 
-    cpus: 0.5
+    cpus: 1
     mem_limit: 1g
 
     command:
