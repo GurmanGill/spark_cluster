@@ -35,24 +35,23 @@ Worker CPU / Memory
 
 ## Ideal for experimenting:
 
-Partitions
-Repartition / Coalesce
-Shuffles
-Aggregations
-Joins
-Broadcast Joins
-Sort-Merge Joins
-Data Skew
-Salting
-AQE
-Caching / Persist
-Executor Memory
-Executor Cores
-Delta Tables
-Delta Transaction Logs
-Spark Job Groups
-Spark Event Logs
-Spark History Server
+- Partitions
+- Repartition / Coalesce
+- Shuffles
+- Joins
+- Broadcast Joins
+- Sort-Merge Joins
+- Aggregations
+- Data Skew
+- Salting
+- AQE
+- Caching
+- Executor Memory
+- Executor Cores
+- Delta Tables
+- Delta Transaction Logs
+- Spark Job Groups
+- Spark History
 
 ## What You Need
 
