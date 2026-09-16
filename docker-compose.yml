@@ -18,8 +18,7 @@ services:
 
     # Start Spark Master
     command:
-      - /opt/spark/bin/spark-class
-      - org.apache.spark.deploy.master.Master
+      - /opt/spark/start-master.sh
 
     # Host:Container
     ports:

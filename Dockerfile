@@ -79,6 +79,10 @@ RUN mkdir -p /tmp/spark-home && \
 # Jupyter will now use /tmp/spark-home instead of /nonexistent.
 ENV HOME="/tmp/spark-home"
 
+# Copy master script, start spark and jupyter 
+COPY start-master.sh /opt/spark/start-master.sh
+USER root
+RUN chmod +x /opt/spark/start-master.sh
 
 # Drop root privileges.
 # Spark Master, Workers, Jupyter, and our applications will run
