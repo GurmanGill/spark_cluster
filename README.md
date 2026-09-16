@@ -2,16 +2,56 @@
 
 A lightweight local **Apache Spark 4.2.0** standalone cluster built with Docker for hands-on learning and experimentation.
 
-It provides a complete mini Spark environment with:
+The goal of this project is to make Spark internals easy to observe on a small machine without requiring large production-scale datasets.
+
+## Capabilities
+
+The cluster includes:
 
 - **1 Spark Master**
 - **4 Spark Workers**
 - **JupyterLab** for interactive PySpark development
 - **Delta Lake** support
 - **Adaptive Query Execution (AQE)** experiments
-- **Live Spark UI** for jobs, stages, tasks, and executors
+- **Live Spark UI** for jobs, stages, tasks, executors, and SQL plans
 - **Spark History Server** with persisted event logs
 - Local `jobs/` and `data/` folders mounted directly into the cluster
+
+It is designed to help you understand how Spark actually executes workloads:
+
+````text
+DataFrame operations
+        ↓
+Spark Jobs
+        ↓
+Stages
+        ↓
+Tasks
+        ↓
+Executors
+        ↓
+Worker CPU / Memory
+
+## Ideal for experimenting:
+
+Partitions
+Repartition / Coalesce
+Shuffles
+Aggregations
+Joins
+Broadcast Joins
+Sort-Merge Joins
+Data Skew
+Salting
+AQE
+Caching / Persist
+Executor Memory
+Executor Cores
+Delta Tables
+Delta Transaction Logs
+Spark Job Groups
+Spark Event Logs
+Spark History Server
 
 ## What You Need
 
@@ -25,7 +65,7 @@ Clone the repo:
 ```bash
 git clone git@github.com:GurmanGill/spark_cluster.git
 cd spark_cluster
-```
+````
 
 Build and start everything:
 
