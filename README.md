@@ -1,136 +1,36 @@
 # Tiny Spark Docker Cluster
 
-A small Spark 4.2.0 standalone cluster for learning partitions, shuffles, joins, skew, memory pressure, and executor behavior without requiring large datasets.
+A small Spark 4.2.0 standalone cluster for learning Spark locally with Docker. It includes 1 Spark master, 4 workers, JupyterLab, Spark UI access, AQE experiments, and Delta Lake support.
 
-## Architecture
+## Quick Start
 
-```text
-Mac
-│
-└── Docker network: spark-net
-    │
-    ├── spark-master
-    │   ├── 2 CPUs
-    │   └── 1 GB RAM
-    │
-    ├── spark-worker-1
-    ├── spark-worker-2
-    ├── spark-worker-3
-    └── spark-worker-4
-        ├── 0.5 CPU each
-        ├── 1 GB Docker RAM limit
-        ├── 1 Spark core
-        └── 768 MB advertised Spark memory
-```
+### 1. Install
 
-A typical application uses:
+You need:
 
-```text
-Executor cores:   1
-Executor memory:  512 MB
-```
+- Docker Desktop
+- Git
 
-This leaves additional container memory for the worker JVM, Python worker, JVM native memory, network buffers, and other overhead.
-
----
-
-## How the Cluster Starts
-
-The master container starts the Spark Standalone Master:
+### 2. Clone the repo
 
 ```bash
-spark-class org.apache.spark.deploy.master.Master
+git clone git@github.com:GurmanGill/spark_cluster.git
+cd spark_cluster
 ```
 
-Each worker starts:
-
-```bash
-spark-class \
-  org.apache.spark.deploy.worker.Worker \
-  spark://spark-master:7077
-```
-
-The flow is:
-
-```text
-Worker starts
-    ↓
-Docker DNS resolves spark-master
-    ↓
-Worker connects to spark-master:7077
-    ↓
-Worker registers its cores and memory
-    ↓
-Master can schedule executors on it
-```
-
----
-
-## Ports
-
-The master exposes:
-
-```yaml
-ports:
-  - "7077:7077"
-  - "9000:8080"
-```
-
-### 7077 — Spark Master
-
-Used by Spark applications to connect to the cluster:
-
-```text
-spark://localhost:7077
-```
-
-Inside Docker:
-
-```text
-spark://spark-master:7077
-```
-
-### 9000 — Spark Master UI
-
-Spark listens on `8080` inside the container, but it is mapped to `9000` on the Mac:
-
-```text
-Mac :9000
-   ↓
-Container :8080
-```
-
-Open:
-
-```text
-http://localhost:9000
-```
-
-The UI shows workers, cores, advertised memory, running applications, and completed applications.
-
----
-
-## Build and Start
-
-If the Dockerfile or dependencies changed:
+### 3. Build and start the cluster
 
 ```bash
 docker compose up -d --build
 ```
 
-Otherwise:
-
-```bash
-docker compose up -d
-```
-
-Check containers:
+Check the containers:
 
 ```bash
 docker compose ps
 ```
 
-Expected:
+You should see:
 
 ```text
 spark-master
@@ -140,13 +40,7 @@ spark-worker-3
 spark-worker-4
 ```
 
-Check resource usage:
-
-```bash
-docker stats
-```
-
-Stop everything:
+Stop the cluster with:
 
 ```bash
 docker compose down
@@ -154,184 +48,275 @@ docker compose down
 
 ---
 
-## Running a Spark Job Inside Docker
+## Open the Interfaces
 
-Enter the master:
-
-```bash
-docker exec -it spark-master bash
-```
-
-The local `jobs/` folder is mounted at:
+### Spark Cluster UI
 
 ```text
-/jobs
+http://localhost:9000
 ```
 
-Submit:
+This is the Spark Standalone Master UI. Use it to see:
 
-```bash
-spark-submit \
-  --master spark://spark-master:7077 \
-  --executor-memory 512m \
-  --executor-cores 1 \
-  /jobs/test.py
+- registered workers
+- available cores and memory
+- running applications
+- completed applications
+
+### Spark Jobs / Stages / Tasks UI
+
+```text
+http://localhost:4040
 ```
 
-Example `test.py`:
+This is the Spark Driver UI for the active notebook Spark application. Use it to inspect:
+
+- Jobs
+- Stages
+- Tasks
+- Executors
+- SQL plans
+- Shuffle read/write
+
+Port `4040` is available after a notebook creates a `SparkSession`.
+
+### JupyterLab
+
+```text
+http://localhost:8888
+```
+
+The repo starts JupyterLab automatically inside the `spark-master` container.
+
+Open `test.ipynb` from the `jobs/` folder to run the sample Spark code.
+
+---
+
+## Local Files and Docker Volumes
+
+Docker Compose maps these local folders directly into every Spark container:
+
+```yaml
+volumes:
+  - ./jobs:/jobs
+  - ./data:/data
+```
+
+That means:
+
+```text
+Local repo                 Docker containers
+
+./jobs        <--------->  /jobs
+./data        <--------->  /data
+```
+
+You can edit notebooks, Python jobs, or data directly from your local repo and the changes are immediately visible inside the containers.
+
+For example:
+
+```text
+jobs/test.ipynb
+```
+
+is available inside Docker as:
+
+```text
+/jobs/test.ipynb
+```
+
+Delta files written to:
+
+```text
+/data/delta/category_summary
+```
+
+are stored locally under:
+
+```text
+data/delta/category_summary
+```
+
+---
+
+## How the Spark Test Notebook Works
+
+The notebook creates a Spark Driver and connects it to the standalone Spark Master:
 
 ```python
+from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
-spark = (
+builder = (
     SparkSession.builder
-    .appName("SparkLab-Test")
-    .getOrCreate()
+    .appName("DeltaLab")
+    .master("spark://spark-master:7077")
+    .config("spark.executor.memory", "512m")
+    .config("spark.executor.cores", "1")
+    .config(
+        "spark.sql.extensions",
+        "io.delta.sql.DeltaSparkSessionExtension"
+    )
+    .config(
+        "spark.sql.catalog.spark_catalog",
+        "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
 )
 
-data = [
-    (1, "Alice"),
-    (2, "Bob"),
-    (3, "Charlie"),
-    (4, "David"),
-]
-
-df = spark.createDataFrame(data, ["id", "name"])
-
-df.show()
-
-spark.stop()
+spark = configure_spark_with_delta_pip(builder).getOrCreate()
 ```
 
-Output:
+The flow is:
 
 ```text
-+---+-------+
-| id|   name|
-+---+-------+
-|  1|  Alice|
-|  2|    Bob|
-|  3|Charlie|
-|  4|  David|
-+---+-------+
+Jupyter notebook
+      ↓
+Python kernel
+      ↓
+Spark Driver JVM
+      ↓
+Spark Master
+      ↓
+Spark Workers
+      ↓
+Executor JVMs
+      ↓
+Tasks process partitions
 ```
+
+### Adaptive Query Execution
+
+AQE can be enabled in the notebook with:
+
+```python
+spark.conf.set("spark.sql.adaptive.enabled", "true")
+```
+
+Use the Spark Driver UI on port `4040` to compare jobs, stages, and query plans with AQE enabled or disabled.
 
 ---
 
-## Running From the Mac
+## Delta Lake Support
 
-Because port `7077` is published, Spark can also be submitted from the host:
-
-```bash
-spark-submit \
-  --master spark://localhost:7077 \
-  --conf spark.driver.host=host.docker.internal \
-  --executor-memory 512m \
-  --executor-cores 1 \
-  jobs/test.py
-```
-
-In this case:
-
-```text
-Driver → Mac
-
-Master → Docker
-
-Executors → Docker workers
-```
-
-`host.docker.internal` gives the Docker executors an address they can use to communicate back to the driver running on the Mac.
-
----
-
-## Spark 4.2 Memory Limits
-
-Spark 4.2 rejected a `256 MB` executor with:
-
-```text
-Executor memory must be at least 450 MiB
-```
-
-Therefore this does not work:
-
-```bash
---executor-memory 256m
-```
-
-The practical minimum for this lab is approximately:
-
-```text
-Spark minimum executor heap ≈ 450 MB
-Our executor heap           = 512 MB
-```
-
-Also remember:
-
-```text
-Executor memory ≠ total container memory
-```
-
-A worker needs memory for more than the executor heap:
-
-```text
-1 GB worker container
-│
-├── 512 MB executor heap
-├── Spark Worker JVM
-├── JVM native overhead
-├── Python worker
-├── network/shuffle buffers
-└── other process overhead
-```
-
-This is why the Docker worker limit is larger than `spark.executor.memory`.
-
----
-
-## Worker Memory vs Docker Memory
-
-Docker controls the real hard limit:
-
-```yaml
-mem_limit: 1g
-```
-
-Spark advertises a smaller amount to the master:
-
-```yaml
-environment:
-  SPARK_WORKER_CORES: 1
-  SPARK_WORKER_MEMORY: 768m
-```
-
-The Spark UI displays:
-
-```text
-768 MB
-```
-
-because it shows the resources the worker advertises to Spark.
-
-`docker stats` displays the actual container usage and Docker limit.
-
----
-
-## Custom Python Environment
-
-The Docker image is based on:
-
-```dockerfile
-FROM spark:4.2.0-python3
-```
-
-Additional Python libraries are defined in `.env`:
+Delta Lake is installed through `.env`:
 
 ```env
-PYTHON_PACKAGES=pandas pyarrow requests
+PYTHON_PACKAGES=jupyterlab ipykernel pandas pyarrow requests delta-spark==4.4.0
 ```
 
-Docker Compose passes this into the Dockerfile:
+The notebook configures the Delta Spark extensions and catalog, so DataFrames can be written using:
+
+```python
+result.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save("/data/delta/category_summary")
+```
+
+A Delta table contains Parquet data files plus a transaction log:
+
+```text
+category_summary/
+├── _delta_log/
+├── part-....parquet
+└── part-....parquet
+```
+
+---
+
+## Architecture
+
+```text
+Mac / Host
+│
+├── localhost:8888  → JupyterLab
+├── localhost:9000  → Spark Master UI
+├── localhost:4040  → Spark Driver UI
+│
+└── Docker network: spark-net
+    │
+    ├── spark-master
+    │   ├── 2 CPUs
+    │   ├── 1 GB RAM
+    │   ├── Spark Master JVM
+    │   ├── JupyterLab
+    │   └── Spark Driver JVM when a notebook creates SparkSession
+    │
+    ├── spark-worker-1
+    ├── spark-worker-2
+    ├── spark-worker-3
+    └── spark-worker-4
+        ├── 0.5 CPU each
+        ├── 1 GB RAM each
+        ├── 1 Spark core each
+        └── Executor JVMs run application tasks
+```
+
+---
+
+## How Docker Compose Starts Everything
+
+`docker-compose.yml` creates the custom `spark-net` network and starts all five containers from the same image:
+
+```text
+spark_lab:4.2.0-python3
+```
+
+### Master
+
+The master runs:
+
+```text
+/opt/spark/start-master.sh
+```
+
+`start-master.sh` starts the Spark Master in the background:
+
+```bash
+spark-class org.apache.spark.deploy.master.Master
+```
+
+and keeps JupyterLab running in the foreground:
+
+```bash
+jupyter lab \
+  --ip=0.0.0.0 \
+  --port=8888 \
+  --no-browser \
+  --IdentityProvider.token= \
+  --ServerApp.root_dir=/jobs
+```
+
+### Workers
+
+Each worker starts with:
+
+```bash
+spark-class \
+  org.apache.spark.deploy.worker.Worker \
+  spark://spark-master:7077
+```
+
+Docker DNS resolves the hostname `spark-master`, allowing every worker to register with the master.
+
+Each worker is configured with:
+
+```yaml
+SPARK_WORKER_CORES: 1
+SPARK_WORKER_MEMORY: 1g
+```
+
+---
+
+## Environment and Image Setup
+
+`.env` defines the Python packages installed during the Docker image build:
+
+```env
+PYTHON_PACKAGES=jupyterlab ipykernel pandas pyarrow requests delta-spark==4.4.0
+```
+
+Docker Compose passes this value into the Dockerfile:
 
 ```yaml
 build:
@@ -340,100 +325,37 @@ build:
     PYTHON_PACKAGES: ${PYTHON_PACKAGES}
 ```
 
-The Dockerfile installs them:
+The Dockerfile starts from:
 
 ```dockerfile
-ARG PYTHON_PACKAGES
-
-RUN python3 -m pip install --no-cache-dir ${PYTHON_PACKAGES}
+FROM spark:4.2.0-python3
 ```
 
----
-
-## Custom Logging
-
-Spark normally prints a large amount of `INFO` logging.
-
-For this learning environment we use a custom:
-
-```text
-log4j2.properties
-```
-
-and copy it into:
-
-```text
-/opt/spark/conf/log4j2.properties
-```
-
-from the Dockerfile.
-
-The goal is to suppress normal Spark infrastructure logs so the terminal mainly shows:
-
-```text
-df.show()
-print(...)
-errors
-```
-
-instead of hundreds of lines about schedulers, block managers, RPC connections, and executors.
-
-Some JVM-level startup messages such as:
-
-```text
-WARNING: Using incubator modules: jdk.incubator.vector
-```
-
-may still appear because they are emitted outside normal Spark Log4j logging.
+so Java, Spark, Python, and PySpark already come from the same Spark 4.2.0 image. The Dockerfile then adds Jupyter and the additional Python libraries used by this lab.
 
 ---
 
 ## Useful Commands
 
 ```bash
-# Start
-docker compose up -d
-
-# Rebuild after Dockerfile/dependency changes
+# Build and start
 docker compose up -d --build
+
+# Start without rebuilding
+docker compose up -d
 
 # Check containers
 docker compose ps
 
-# Watch CPU/RAM
+# Watch CPU and RAM
 docker stats
 
-# Enter master
+# Enter the master container
 docker exec -it spark-master bash
 
-# Worker logs
+# View worker logs
 docker logs spark-worker-1
 
-# Spark Master UI
-http://localhost:9000
-
-# Stop/remove cluster
+# Stop the cluster
 docker compose down
 ```
-
-## Goal of This Lab
-
-Keep the cluster deliberately small and change one Spark variable at a time:
-
-```text
-partition count
-repartition / coalesce
-shuffle partitions
-groupBy
-sort / distinct
-joins
-broadcast joins
-data skew
-salting
-cache / persist
-AQE
-executor memory
-executor cores
-```
-
-This makes the effects visible with relatively small datasets instead of requiring multi-GB production-scale data.
