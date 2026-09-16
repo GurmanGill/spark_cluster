@@ -28,8 +28,8 @@ services:
       - "8888:8888"
 
     volumes:
-      - ./jobs:/jobs
-      - ./data:/data
+      - ./jobs:/workspace/jobs
+      - ./data:/workspace/data
 
     networks:
       - spark-net
@@ -60,8 +60,8 @@ services:
       - spark-master
 
     volumes:
-      - ./jobs:/jobs
-      - ./data:/data
+      - ./jobs:/workspace/jobs
+      - ./data:/workspace/data
 
     networks:
       - spark-net
@@ -90,8 +90,8 @@ services:
       - spark-master
 
     volumes:
-      - ./jobs:/jobs
-      - ./data:/data
+      - ./jobs:/workspace/jobs
+      - ./data:/workspace/data
 
     networks:
       - spark-net
@@ -120,8 +120,8 @@ services:
       - spark-master
 
     volumes:
-      - ./jobs:/jobs
-      - ./data:/data
+      - ./jobs:/workspace/jobs
+      - ./data:/workspace/data
 
     networks:
       - spark-net
@@ -150,8 +150,8 @@ services:
       - spark-master
 
     volumes:
-      - ./jobs:/jobs
-      - ./data:/data
+      - ./jobs:/workspace/jobs
+      - ./data:/workspace/data
 
     networks:
       - spark-net

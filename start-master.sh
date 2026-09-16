@@ -6,9 +6,9 @@ set -e
   org.apache.spark.deploy.master.Master &
 
 # Start Jupyter in foreground
-exec jupyter lab \
+jupyter lab \
   --ip=0.0.0.0 \
   --port=8888 \
   --no-browser \
   --IdentityProvider.token= \
-  --ServerApp.root_dir=/jobs
+  --ServerApp.root_dir=/workspace
