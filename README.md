@@ -15,9 +15,9 @@ The cluster includes:
 - **Adaptive Query Execution (AQE)** experiments
 - **Live Spark UI** for jobs, stages, tasks, executors, and SQL plans
 - **Spark History Server** with persisted event logs
-- Local `jobs/` and `data/` folders mounted directly into the cluster
+- Local `jobs/`, `data/`, and `spark-events/` folders mounted directly into the cluster
 
-It is designed to help you understand how Spark actually executes workloads:
+It is designed to help you understand how Spark executes workloads:
 
 ```text
 DataFrame operations
@@ -33,7 +33,7 @@ Executors
 Worker CPU / Memory
 ```
 
-## Ideal for experimenting:
+## Ideal for experimenting with
 
 - Partitions
 - Repartition / Coalesce
@@ -97,12 +97,12 @@ docker compose down
 
 ## Open the UIs
 
-| UI                   | URL                    | Purpose                                           |
-| -------------------- | ---------------------- | ------------------------------------------------- |
-| JupyterLab           | http://localhost:8888  | Run the notebooks                                 |
-| Spark Master UI      | http://localhost:9000  | Workers, cores, memory, applications              |
-| Spark Driver UI      | http://localhost:4040  | Live jobs, stages, tasks, executors and SQL plans |
-| Spark History Server | http://localhost:18080 | View persisted Spark application history          |
+| UI                   | URL                    | Purpose                                        |
+| -------------------- | ---------------------- | ---------------------------------------------- |
+| JupyterLab           | http://localhost:8888  | Run notebooks                                  |
+| Spark Master UI      | http://localhost:9000  | Workers, cores, memory, applications           |
+| Spark Driver UI      | http://localhost:4040  | Live jobs, stages, tasks, executors, SQL plans |
+| Spark History Server | http://localhost:18080 | Persisted Spark application history            |
 
 Port `4040` becomes available after the notebook creates a `SparkSession`.
 
@@ -142,7 +142,8 @@ spark_cluster/
 │   ├── test.ipynb
 │   └── spark_utils.py
 ├── data/
-└── spark-events/
+├── spark-events/
+└── img/
 ```
 
 The local folders are mounted directly into the containers:
@@ -155,7 +156,7 @@ Local repo                 Docker
 ./spark-events <------->   /workspace/spark-events
 ```
 
-This means notebook, Python, data, Delta-table, and Spark event-log changes are immediately visible on your local machine and survive container recreation.
+This means notebook/code changes, datasets, Delta-table files, and Spark event logs are stored directly in the local repository and survive container recreation.
 
 ## Sample Notebook
 
@@ -183,8 +184,18 @@ builder = (
     .master("spark://spark-master:7077")
     .config("spark.executor.memory", "1g")
     .config("spark.executor.cores", "1")
+
+    # Adaptive Query Execution
+    .config("spark.sql.adaptive.enabled", "true")
+
+    # Persist Spark events for the History Server
     .config("spark.eventLog.enabled", "true")
-    .config("spark.eventLog.dir", "file:/workspace/spark-events")
+    .config(
+        "spark.eventLog.dir",
+        "file:/workspace/spark-events"
+    )
+
+    # Delta Lake support
     .config(
         "spark.sql.extensions",
         "io.delta.sql.DeltaSparkSessionExtension"
@@ -201,9 +212,9 @@ spark = configure_spark_with_delta_pip(builder).getOrCreate()
 The execution flow is:
 
 ```text
-Jupyter notebook
+Jupyter / VS Code Notebook
       ↓
-Python kernel
+Python Kernel
       ↓
 Spark Driver JVM
       ↓
@@ -224,15 +235,48 @@ spark.stop()
 
 The master and workers continue running; only the current Spark application stops.
 
-## AQE
+## VS Code Notebooks
 
-Adaptive Query Execution can be enabled from the notebook:
+The same `.ipynb` notebooks can also be opened directly in VS Code.
 
-```python
-spark.conf.set("spark.sql.adaptive.enabled", "true")
+Install:
+
+- Python extension
+- Jupyter extension
+
+Then connect the notebook kernel to the Jupyter server running in Docker:
+
+```text
+http://localhost:8888
 ```
 
-Use `localhost:4040` to compare stages, shuffle behavior, and physical plans with AQE enabled or disabled.
+VS Code becomes the notebook frontend while the Python kernel and Spark Driver continue running inside the `spark-master` container.
+
+```text
+VS Code
+   ↓
+Jupyter Server
+   ↓
+Python Kernel
+   ↓
+Spark Driver JVM
+   ↓
+Spark Master
+   ↓
+Workers / Executors
+```
+
+## AQE
+
+Adaptive Query Execution is enabled in the sample `SparkSession`:
+
+```python
+.config("spark.sql.adaptive.enabled", "true")
+```
+
+AQE allows Spark to modify parts of the physical execution plan at runtime using actual shuffle statistics.
+
+Use `http://localhost:4040` to inspect stages, shuffle behavior, and physical plans.
 
 ## Delta Lake
 
@@ -247,7 +291,9 @@ requests
 delta-spark==4.4.0
 ```
 
-The Docker image also downloads and caches the matching Delta JVM dependencies during image build, so the notebook does not need to download the Delta JARs every time a SparkSession starts.
+`delta-spark==4.4.0` provides the Python-side Delta API.
+
+During the Docker image build, the matching Delta JVM dependencies are also resolved and cached inside the image. This prevents every new notebook `SparkSession` from downloading the same Maven dependencies again.
 
 Write a Delta table:
 
@@ -279,7 +325,7 @@ job_id = set_job_context(
 )
 ```
 
-The Spark UI then groups the internal Spark jobs under IDs such as:
+The Spark UI then groups internal Spark jobs under IDs such as:
 
 ```text
 JOB-6f44d309 - Read Delta table
@@ -370,7 +416,7 @@ SPARK_WORKER_MEMORY: 1g
 
 ## Spark History
 
-The notebook writes Spark event logs to:
+The Spark Driver writes application events to:
 
 ```text
 /workspace/spark-events
@@ -382,15 +428,27 @@ which is mapped to:
 ./spark-events
 ```
 
-The History Server reads the same directory. Because the directory lives on the host, application history remains available after:
+The History Server reads those persisted event logs and reconstructs the application UI after the original Driver has stopped.
+
+Because the directory lives on the host, application history remains available after:
 
 ```bash
 docker compose down
 docker compose up -d
 ```
 
-Open persisted history at:
+Use:
+
+```text
+http://localhost:4040
+```
+
+for the current live Spark application.
+
+Use:
 
 ```text
 http://localhost:18080
 ```
+
+for persisted historical applications.
