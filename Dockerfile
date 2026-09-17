@@ -5,10 +5,8 @@
 # - PySpark under /opt/spark/python
 FROM spark:4.2.0-python3
 
-
 # Root is required to install Python packages and modify the spark user.
 USER root
-
 
 # Install additional Python libraries.
 # delta-spark provides the Python-side Delta API.
@@ -18,18 +16,15 @@ RUN python3 -m pip install \
     --no-cache-dir \
     -r /tmp/requirements.txt
 
-
 # Allow commands such as:
 # spark-submit
 # spark-class
 # spark-shell
 ENV PATH="/opt/spark/bin:${PATH}"
 
-
 # Allow normal Python/Jupyter processes to import the PySpark
 # and Py4J bundled with the Spark image.
-ENV PYTHONPATH="/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.9-src.zip:${PYTHONPATH}"
-
+ENV PYTHONPATH="/workspace/jobs:/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.9-src.zip:${PYTHONPATH}"
 
 # Spark's default user has /nonexistent as its home.
 # Jupyter and Ivy need a writable home directory.
@@ -38,7 +33,6 @@ RUN mkdir -p /tmp/spark-home && \
     usermod -d /tmp/spark-home spark
 
 ENV HOME="/tmp/spark-home"
-
 
 # --------------------------------------------------
 # Cache Delta JVM dependencies inside the image
@@ -56,7 +50,6 @@ RUN echo 'print("Delta dependencies cached")' > /tmp/delta_init.py && \
     --packages io.delta:delta-spark_4.2_2.13:4.4.0 \
     /tmp/delta_init.py && \
     rm /tmp/delta_init.py
-
 
 # --------------------------------------------------
 # Master startup script
