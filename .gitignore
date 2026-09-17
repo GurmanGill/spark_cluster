@@ -1,0 +1,4 @@
+.DS_Store
+.ipynb_checkpoints/
+jobs/__pycache__/
+spark-events/
